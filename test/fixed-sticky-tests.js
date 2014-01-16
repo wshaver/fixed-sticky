@@ -20,6 +20,8 @@
 			raises(block, [expected], [message])
 	*/
 
+	QUnit.config.reorder = false;
+
 	FixedSticky.tests.sticky = false;
 
 	module('testDefault', {
@@ -160,6 +162,27 @@
 		$(window).scrollTop( 2000 ).trigger( 'scroll' );
 		equal( $sticky.css( 'position' ), 'fixed' );
 		equal( $sticky.offset().top, 2000 );
+	});
+
+	asyncTest( 'Standard Top using animation frame', function() {
+
+		window.FixedSticky.enableAnimationFrame();
+
+		$( '#qunit-fixture' ).html(
+				['<style>#sticky { top: 0; }</style>',
+				'<div id="sticky" class="fixedsticky">Sticky</div>',
+				'<div style="height: 2000px">Test</div>'].join( '' ) );
+
+		var $sticky = $( '#sticky' );
+		$sticky.fixedsticky();
+
+		ok( $sticky.hasClass( 'fixedsticky' ) );
+		$(window).scrollTop( 1000 );
+		setTimeout(function(){ //because we're not triggering the event, we need to give it one cycle to repaint
+			equal( $sticky.css( 'position' ), 'fixed' );
+			equal( $sticky.offset().top, 1000 );
+			start();
+		},0);
 	});
 
 }( jQuery ));

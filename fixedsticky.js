@@ -1,5 +1,7 @@
 ;(function( win, $ ) {
 
+	var requestAnimationFrame, cancelAnimationFrame, uniqueIdCounter = 0, scrollTop = 0;
+
 	function featureTest( property, value, noPrefixes ) {
 		// Thanks Modernizr! https://github.com/phistuck/Modernizr/commit/3fb7217f5f8274e2f11fe6cfeda7cfaf9948a1f5
 		var prop = property + ':',
@@ -14,11 +16,16 @@
 		return mStyle[ property ].indexOf( value ) !== -1;
 	}
 
+	var vendors = ['ms', 'moz', 'webkit', 'o'];
+	for(var x = 0; x < vendors.length && !requestAnimationFrame; ++x) {
+		requestAnimationFrame = window[vendors[x]+'RequestAnimationFrame'];
+		cancelAnimationFrame = window[vendors[x]+'CancelAnimationFrame'] ||
+		window[vendors[x]+'CancelRequestAnimationFrame'];
+	}
+
 	function getPx( unit ) {
 		return parseInt( unit, 10 ) || 0;
 	}
-
-	var uniqueIdCounter = 0;
 
 	var S = {
 		classes: {
@@ -37,7 +44,25 @@
 			sticky: featureTest( 'position', 'sticky' ),
 			fixed: featureTest( 'position', 'fixed', true )
 		},
+		enableAnimationFrame: function(){
+			if( !requestAnimationFrame ){
+				return;
+			}
+			S.animationFrameElements = {};
+			requestAnimationFrame( S.requestAnimationFrameLoop );
+		},
 		// Thanks jQuery!
+		requestAnimationFrameLoop: function(){
+			var scroll = S.getScrollTop();
+			if( scrollTop != scroll ){
+				scrollTop = scroll;
+				$.each( S.animationFrameElements, function(){
+					S.update( this );
+				});
+
+			}
+			requestAnimationFrame( S.requestAnimationFrameLoop );
+		},
 		getScrollTop: function() {
 			var prop = 'pageYOffset',
 				method = 'scrollTop';
@@ -53,7 +78,7 @@
 		},
 		refresh: function( el ) {
 			var $el = $( el );
-			return $el.each(function() {
+			return $el.each( function() {
 				$( this )
 					.removeData( [ S.keys.offset, S.keys.position ] )
 					.removeClass( S.classes.active + ' ' + S.classes.inactive )
@@ -150,6 +175,10 @@
 				var id = $this.data( S.keys.id );
 				$( win ).unbind( '.fixedsticky' + id );
 
+				if( S.animationFrameElements ) {
+					delete S.animationFrameElements[id];
+				}
+
 				$this
 					.removeData( [ S.keys.offset, S.keys.position, S.keys.id ] )
 					.removeClass( S.classes.active )
@@ -169,9 +198,13 @@
 				var id = uniqueIdCounter++;
 				$( this ).data( S.keys.id, id );
 
-				$( win ).bind( 'scroll.fixedsticky' + id, function() {
-					S.update( _this );
-				}).trigger( 'scroll.fixedsticky' + id );
+				if( S.animationFrameElements ) {
+					S.animationFrameElements[id] = this;
+				} else {
+					$( win ).bind( 'scroll.fixedsticky' + id, function() {
+						S.update( _this );
+					}).trigger( 'scroll.fixedsticky' + id );
+				}
 
 				$( win ).bind( 'resize.fixedsticky' + id , function() {
 					if( $el.is( '.' + S.classes.active ) ) {
